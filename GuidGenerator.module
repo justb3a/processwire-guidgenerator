@@ -1,0 +1,132 @@
+<?php namespace ProcessWire;
+
+/**
+* GuidGenerator
+*
+* See README.md for usage instructions.
+*
+* @author Tabea David <td@kf-interactive.com>
+* @version 0.0.1
+* @copyright Copyright (c) 2017
+* @see https://github.com/justonestep/processwire-guidgenerator
+* @see http://www.processwire.com
+*/
+
+/**
+* Class GuidGenerator
+*/
+class GuidGenerator extends WireData implements Module {
+
+  /**
+   * Retrieves module meta data
+   * Implementation of the Module interface
+   *
+   * @return array
+   * @see http://processwire.com/apigen/class-Module.html
+   */
+  public static function getModuleInfo() {
+    return array(
+      'title' => 'GUID / UUID Generator',
+      'summary' => 'Generate a globally unique identifier (GUID)',
+      'version' => 001,
+      'href' => 'https://github.com/justonestep/processwire-guidgenerator',
+      'singular' => true,
+      'autoload' => true,
+    );
+  }
+
+  /**
+   * Initialize the module - ready
+   *
+   * ProcessWire calls this when the module is loaded. For 'autoload' modules, this will be called
+   * when ProcessWire's API is ready. As a result, this is a good place to attach hooks.
+   *
+   * @see http://processwire.com/apigen/class-Module.html
+   */
+  public function ready() {
+    $this->addHookProperty('InputfieldText::generateGuid', $this, 'addProperty');
+    $this->addHookAfter('InputfieldText::getConfigInputfields', $this, 'addInputfield');
+    $this->addHookBefore('InputfieldText::render', $this, 'generateGuidValue');
+  }
+
+  /**
+   * Add property for inputfield text
+   *
+   * @param HookEvent $event
+   */
+  public function addProperty(HookEvent $event) {
+    $event->return = 0;
+  }
+
+  /**
+   * Add GUID Option
+   *
+   * @param HookEvent $event
+   */
+  public function addInputfield(HookEvent $event){
+    if (!$event->object instanceof InputfieldText) return;
+
+    $data = $event->object;
+
+    /** @var InputfieldCheckbox $field */
+    $field = $this->modules->get('InputfieldCheckbox');
+    $field->attr('name', 'generateGuid');
+    $field->label = $this->_('Generate GUID');
+    $field->description = $this->_('When checked, a globally unique identifier (GUID) wil be generated when the form is rendered.');
+    $field->attr('value', 1);
+
+    if ($data->generateGuid) {
+      $field->attr('checked', 'checked');
+    } else {
+      $field->collapsed = Inputfield::collapsedYes;
+    }
+
+    $event->return->append($field);
+  }
+
+  /**
+   * Assign a GUID
+   *
+   * @param HookEvent $event
+   */
+  public function generateGuidValue(HookEvent $event) {
+    if (!$event->object->generateGuid) return;
+
+    $field = $event->object;
+    $page = $this->pages->get($this->input->get->id);
+
+    $field->setAttribute('disabled', true);
+
+    // empty field? generate GUID
+    if (!$field->value) {
+      $guid = $this->createGUID();
+
+      // check uniqueness
+      if ($this->pages->count("guid={$guid}")) $this->generateGuidValue($event);
+
+      $field->set('value', $guid);
+      $page->setAndSave($field->name, $guid);
+    }
+  }
+
+  /**
+   * Generate GUID
+   */
+  protected function createGUID() {
+    if (function_exists('com_create_guid')){
+        $guid = com_create_guid();
+    } else {
+      $charId = strtoupper(md5(uniqid(rand(), true)));
+
+      $separation = array(0 => 8, 8 => 4, 12 => 4, 16 => 4, 20 => 12);
+      $chars = array();
+      foreach ($separation as $start => $length) {
+        $chars[] = substr($charId, $start, $length);
+      }
+
+      $guid = implode(chr(45), $chars);
+    }
+
+    return $guid;
+  }
+}
