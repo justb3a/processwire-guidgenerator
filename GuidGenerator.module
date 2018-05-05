@@ -102,7 +102,7 @@ class GuidGenerator extends WireData implements Module {
       $guid = $this->createGUID();
 
       // check uniqueness
-      if ($this->pages->count("guid={$guid}")) $this->generateGuidValue($event);
+      if ($this->pages->count("{$field->name}={$guid}")) $this->generateGuidValue($event);
 
       $field->set('value', $guid);
       $page->setAndSave($field->name, $guid);
